@@ -81,3 +81,6 @@ tmp/
 # .env.example is the credential template and must be versioned even though
 # the `.env.*` secret rule above would otherwise catch it.
 !.env.example
+
+# Tests are maintained in the development repository, not the code release.
+tests/
