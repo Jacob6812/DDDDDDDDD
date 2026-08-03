@@ -1,0 +1,146 @@
+symbols_universe:
+- GS
+- MSFT
+- HD
+- V
+- SHW
+- CAT
+- MCD
+- UNH
+- AXP
+- AMGN
+- TRV
+- CRM
+- JPM
+- IBM
+- HON
+- BA
+- AMZN
+- AAPL
+- PG
+- JNJ
+
+data:
+  mode: auto
+
+bars:
+  day:
+    adjusted: true
+
+portfolio:
+  total_cash: 100000
+
+cache:
+  mode: llm_write_only
+
+logging:
+  console_level: INFO
+  file_level: INFO
+  intercept_std_logging: true
+
+backtest:
+  timespan: day
+  commission_bps: 1.0
+  slippage_bps: 2.0
+  fill_ratio: 1.0
+  max_positions: 20
+  rebalance_at_open: false
+  enable_detailed_logging: true
+  summary_llm: false
+  order_retry:
+    max_attempts: 3
+  resume:
+    enabled: true
+    daily_summary_path: ''
+    trade_date: null
+  benchmark:
+    type: per_symbol_buy_and_hold
+    symbol: SPY
+    field: close
+    reindex: inner_join
+    fill: ffill
+    fill_limit: 3
+    total_cash: null
+    trade_price_field: open
+    daily_metrics:
+      enabled: true
+      metrics:
+      - cum_return
+      - max_drawdown
+      - sortino
+      sortino:
+        mode: to_date
+        window: 63
+      save_format:
+      - text
+      - image
+    aggregated_analysis:
+      enabled: true
+      plots:
+        cumreturn_analysis: true
+        price_trends: true
+      visualization:
+        individual_alpha: 0.3
+        average_linewidth: 3
+        figure_size:
+        - 12
+        - 8
+        dpi: 300
+      key_metrics:
+        highlight:
+        - cum_return
+        - max_drawdown
+        - sortino
+        annotation_box: true
+    multi_period_analysis:
+      enabled: true
+      plots:
+        performance_heatmap: true
+        rolling_sortino: true
+        rolling_sharpe: true
+        rolling_drawdown: true
+        ranking_over_time: true
+      windows:
+        heatmap_periods:
+        - 5
+        - 10
+        - 21
+        - 42
+        - 63
+        - 126
+        - 252
+        rolling_window: 63
+        ranking_window: 21
+      visualization:
+        figure_size:
+        - 14
+        - 8
+        dpi: 300
+        alpha: 0.8
+        linewidth: 1.5
+
+api:
+  polygon:
+    api_key: ${POLYGON_API_KEY}
+    base_url: https://api.polygon.io
+  finnhub:
+    api_key: ${FINNHUB_API_KEY}
+    base_url: https://finnhub.io/api/v1
+
+darwintrade:
+  artifact_root: ''
+  max_gross_exposure: 0.95     # |long| + |short| ≤ this
+  max_single_position: 1.0     # |target_weight| safety net (1.0 == off; lower if you want a hard cap)
+  min_confidence_threshold: 0.35
+  # Ablation switches — flip these (or use a sibling config_*.yaml) to disable
+  # each evolutionary memory layer independently.
+  tactical_enabled: true       # Layer 1: per-bar tactical reflection / evolution
+  strategic_enabled: true      # Layer 2: every-N-day strategic review / patch
+  memory:
+    enabled: true              # master switch — false collapses both layers to NullMemory
+    memory_root: ''
+
+# External agent warm-up length. Adapter default fallback is 2 years — 4x the
+# work for no additional signal. Keep this explicit so a future edit is visible.
+finagent:
+  training_years: 0.5

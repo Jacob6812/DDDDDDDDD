@@ -1,0 +1,83 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+build/
+dist/
+
+# === IDE / OS ===
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# === Project artefacts (huge or transient) ===
+# Backtest reports (multi-GB after full runs)
+storage/reports/
+
+# Runtime logs
+storage/logs/
+
+# Data caches (parquet bars, news, fundamentals — hundreds of MB)
+storage/cache/
+
+# In-run memory state written by pipeline
+storage/memory/
+
+# === Agent tooling state (contains absolute paths / local machine details) ===
+.omc/
+.claude/
+.agents/
+
+# === Secrets ===
+.env
+.env.*
+.envmm
+.envds
+.envoss
+.envnvidia
+
+# === LaTeX build artefacts (embed absolute build paths) ===
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+
+# External vendored repos (kept outside version control per project policy)
+external/
+
+# Third-party material: published PDFs and other authors' paper sources.
+literature/
+mentor_work/
+
+# Paper sources live in a separate repository.
+AAAIAuthorKit27/
+
+# tmp / scratch
+tmp/
+*.tmp
+*.bak
+*~
+
+# Notebooks checkpoints
+.ipynb_checkpoints/
+
+# --- explicit KEEP override ---
+# .env.example is the credential template and must be versioned even though
+# the `.env.*` secret rule above would otherwise catch it.
+!.env.example

@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper below."
+title: "DarwinTrade: Hierarchical Self-Evolution for Multi-Agent Portfolio Trading"
+abstract: >-
+  DarwinTrade is a multi-agent trading system that decomposes policy adaptation
+  into three state-disjoint self-evolution loops (analyst reliability, expiring
+  tactical guards, and trialed allocator patches) over a deterministic executor
+  that the LLM never edits.
+type: software
+license: MIT
+repository-code: "https://github.com/Jacob6812/DarwinTrade"
+authors:
+  - family-names: Fang
+    given-names: Jie
+    affiliation: "School of Economics, Renmin University of China"
+  - family-names: Zhang
+    given-names: Shaolei
+    affiliation: "School of Information, Renmin University of China"
+keywords:
+  - large language models
+  - multi-agent systems
+  - self-evolution
+  - portfolio management
+  - algorithmic trading
+preferred-citation:
+  type: article
+  title: "DarwinTrade: Hierarchical Self-Evolution for Multi-Agent Portfolio Trading"
+  year: 2026
+  authors:
+    - family-names: Fang
+      given-names: Jie
+      affiliation: "School of Economics, Renmin University of China"
+    - family-names: Zhang
+      given-names: Shaolei
+      affiliation: "School of Information, Renmin University of China"

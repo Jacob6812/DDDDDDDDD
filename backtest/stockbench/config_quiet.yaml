@@ -1,0 +1,133 @@
+api:
+  finnhub:
+    api_key: ${FINNHUB_API_KEY}
+    base_url: https://finnhub.io/api/v1
+  polygon:
+    api_key: ${POLYGON_API_KEY}
+    base_url: https://api.polygon.io
+backtest:
+  benchmark:
+    aggregated_analysis:
+      enabled: true
+      key_metrics:
+        annotation_box: true
+        highlight:
+        - cum_return
+        - max_drawdown
+        - sortino
+      plots:
+        cumreturn_analysis: true
+        price_trends: true
+      visualization:
+        average_linewidth: 3
+        dpi: 300
+        figure_size:
+        - 12
+        - 8
+        individual_alpha: 0.3
+    daily_metrics:
+      enabled: true
+      metrics:
+      - cum_return
+      - max_drawdown
+      - sortino
+      save_format:
+      - text
+      - image
+      sortino:
+        mode: to_date
+        window: 63
+    field: close
+    fill: ffill
+    fill_limit: 3
+    multi_period_analysis:
+      enabled: true
+      plots:
+        performance_heatmap: true
+        ranking_over_time: true
+        rolling_drawdown: true
+        rolling_sharpe: true
+        rolling_sortino: true
+      visualization:
+        alpha: 0.8
+        dpi: 300
+        figure_size:
+        - 14
+        - 8
+        linewidth: 1.5
+      windows:
+        heatmap_periods:
+        - 5
+        - 10
+        - 21
+        - 42
+        - 63
+        - 126
+        - 252
+        ranking_window: 21
+        rolling_window: 63
+    reindex: inner_join
+    symbol: SPY
+    total_cash: null
+    trade_price_field: open
+    type: per_symbol_buy_and_hold
+  commission_bps: 1.0
+  enable_detailed_logging: false
+  fill_ratio: 1.0
+  max_positions: 20
+  order_retry:
+    max_attempts: 3
+  rebalance_at_open: false
+  resume:
+    daily_summary_path: ''
+    enabled: false
+    trade_date: null
+  slippage_bps: 2.0
+  summary_llm: false
+  timespan: day
+bars:
+  day:
+    adjusted: true
+cache:
+  mode: llm_write_only
+darwintrade:
+  artifact_root: ''
+  max_gross_exposure: 0.95
+  max_single_position: 1.0
+  memory:
+    enabled: true
+    memory_root: ''
+  min_confidence_threshold: 0.35
+  strategic_enabled: true
+  tactical_enabled: true
+data:
+  mode: auto
+finagent:
+  training_years: 0.5
+logging:
+  console_level: WARNING
+  file_level: WARNING
+  intercept_std_logging: true
+portfolio:
+  total_cash: 100000
+symbols_universe:
+- GS
+- MSFT
+- HD
+- V
+- SHW
+- CAT
+- MCD
+- UNH
+- AXP
+- AMGN
+- TRV
+- CRM
+- JPM
+- IBM
+- HON
+- BA
+- AMZN
+- AAPL
+- PG
+- JNJ
