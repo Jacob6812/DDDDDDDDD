@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DarwinTrade</title>
+<link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <h1>DarwinTrade</h1>
+    <p>Self-evolving multi-agent long/short equity research</p>
+  </div>
+  <div class="status" id="status" role="status" aria-live="polite">
+    <span class="dot" id="status-dot"></span>
+    <span id="status-text">checking…</span>
+  </div>
+</header>
+
+<main>
+  <section class="intro" aria-labelledby="intro-title">
+    <p class="eyebrow">RESEARCH WORKSPACE / US EQUITIES</p>
+    <h2 id="intro-title">A clearer view.<br><em>A considered decision.</em></h2>
+    <p>Turn a watchlist into an explained portfolio. Compare analyst signals, inspect risk, and carry what you learn into the next trading day.</p>
+    <div class="steps"><span><b>01</b> Choose stocks</span><span><b>02</b> Analyse evidence</span><span><b>03</b> Review allocation</span></div>
+  </section>
+  <form class="panel controls" id="form" autocomplete="off">
+    <div class="section-heading span2"><div><p class="eyebrow">YOUR NEXT ANALYSIS</p><h2>Build your watchlist</h2></div><span class="tag">USD · US stocks</span></div>
+    <div class="field span2">
+      <label for="symbols">Symbols</label>
+      <input id="symbols" name="symbols" type="text"
+             placeholder="AAPL, MSFT, NVDA"
+             aria-describedby="symbols-help" required />
+      <p class="help" id="symbols-help">
+        Comma or space separated.
+        <button type="button" class="linkish" id="use-universe">Load 20-stock research universe</button>
+      </p>
+      <div class="presets" aria-label="Example watchlists"><button type="button" data-symbols="AAPL, MSFT, NVDA">Technology</button><button type="button" data-symbols="JPM, GS, V">Financials</button><button type="button" data-symbols="AAPL, JPM, JNJ">Mixed sectors</button></div>
+    </div>
+
+    <div class="field">
+      <label for="capital">Capital (USD)</label>
+      <input id="capital" name="capital" type="number" min="1" step="any"
+             value="100000" required aria-describedby="capital-help" />
+      <p class="help" id="capital-help">Starting equity. Continued sessions carry their simulated equity forward.</p>
+    </div>
+
+    <div class="field">
+      <label for="date">Trade date</label>
+      <input id="date" name="date" type="date" aria-describedby="date-help" />
+      <p class="help" id="date-help">Blank = latest available trading day. Continue memory on a later date; start a new session to compare the same day.</p>
+    </div>
+
+    <div class="field span2 memory-row">
+      <label class="checkbox">
+        <input type="checkbox" id="keep-memory" checked />
+        <span>Keep memory across runs (self-evolution)</span>
+      </label>
+      <span class="session" id="session-label" hidden></span>
+      <button type="button" class="linkish" id="reset-session" hidden>New session</button>
+    </div>
+
+    <div class="actions span2">
+      <button type="submit" class="primary" id="run">Run analysis <span aria-hidden="true">↗</span></button>
+      <button type="button" class="secondary" id="example">Explore sample report</button>
+      <span class="hint" id="hint">Each symbol runs a four-role analyst team.</span>
+    </div>
+  </form>
+
+  <section class="panel" id="progress" hidden aria-live="polite">
+    <div class="spinner" aria-hidden="true"></div>
+    <div>
+      <strong id="progress-title">Running the analyst team…</strong>
+      <p class="help" id="progress-note">
+        Regime classification, then four analysts per symbol. This takes a
+        while depending on the provider. Keep this page open until it finishes.
+      </p>
+    </div>
+  </section>
+
+  <section class="panel error" id="error" hidden role="alert"></section>
+
+  <section class="empty-state" id="empty-state">
+    <span class="empty-mark" aria-hidden="true">↗</span>
+    <div><h2>Your research starts with a watchlist.</h2><p>Enter US stock tickers above. Your report will show proposed long and short allocations, the reasoning behind them, and memory from earlier decisions.</p><p class="help">Directional research, not a future price forecast. No orders are placed.</p></div>
+  </section>
+
+  <section id="results" hidden>
+    <div class="section-heading"><div><p class="eyebrow">ANALYSIS REPORT</p><h2 tabindex="-1" id="report-title">Your portfolio view</h2></div><button type="button" class="secondary" id="download">Download JSON ↓</button></div>
+    <p class="help" id="data-notes"></p>
+    <div class="panel summary">
+      <div class="regime">
+        <span class="label">Regime</span>
+        <strong id="regime-label">—</strong>
+        <span class="muted" id="regime-conf"></span>
+      </div>
+      <dl class="metrics" id="exposure"></dl>
+      <p class="help" id="meta"></p>
+    </div>
+
+    <div class="panel">
+      <h2>Proposed allocation</h2>
+      <p class="help">Weights are signed fractions of equity. Short positions profit from falling prices and require borrowing. Confidence is a model score, not a calibrated probability.</p>
+      <div class="table-wrap">
+        <table id="positions-table">
+          <thead>
+            <tr>
+              <th scope="col">Symbol</th>
+              <th scope="col">Side</th>
+              <th scope="col" class="num">Weight</th>
+              <th scope="col" class="num">Notional</th>
+              <th scope="col" class="num">Reference price</th>
+              <th scope="col" class="num">Conf.</th>
+              <th scope="col">Thesis</th>
+            </tr>
+          </thead>
+          <tbody id="positions"></tbody>
+        </table>
+      </div>
+      <p class="help" id="no-positions" hidden></p>
+    </div>
+
+    <div class="panel collapsible">
+      <h2>Memory state</h2>
+      <dl class="metrics" id="memory"></dl>
+      <div class="table-wrap" id="capsule-wrap" hidden>
+        <table>
+          <caption>Analyst reliability by regime and role (IC)</caption>
+          <thead>
+            <tr>
+              <th scope="col">Regime</th>
+              <th scope="col">Role</th>
+              <th scope="col" class="num">IC</th>
+              <th scope="col" class="num">Samples</th>
+            </tr>
+          </thead>
+          <tbody id="capsules"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel collapsible" id="watchlist-panel" hidden>
+      <h2>Analysed, not held</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Symbol</th>
+              <th scope="col">Signal</th>
+              <th scope="col" class="num">Conf.</th>
+              <th scope="col">Why not</th>
+            </tr>
+          </thead>
+          <tbody id="watchlist"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <p class="disclaimer" id="disclaimer">Research support only. Model outputs can be wrong. Review the evidence and data date before making an investment decision.</p>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

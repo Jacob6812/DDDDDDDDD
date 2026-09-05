@@ -1,276 +1,155 @@
 # DarwinTrade
 
-**Hierarchical self-evolution for multi-agent portfolio trading.**
+**An explained stock-research workspace powered by a self-evolving analyst team.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[中文说明](README_ZH.md) · [Research and reproduction](docs/RESEARCH.md) · [MIT license](LICENSE)
 
-Official implementation of *DarwinTrade: Hierarchical Self-Evolution for
-Multi-Agent Portfolio Trading* — Jie Fang, Shaolei Zhang (Renmin University of
-China).
+Enter US stock tickers, choose starting capital and a trading date, and review a proposed long/short portfolio in your browser. DarwinTrade combines market, news, social and fundamental analysis with portfolio constraints and memory from previous decisions.
 
-[English](README.md) · [简体中文](README_ZH.md)
+It produces directional signals and allocation weights, not guaranteed future prices. It does not connect to a broker or place orders. Confidence is a model score, not a calibrated probability of profit.
 
-## Overview
+## Quick start
 
-Most LLM trading agents compress every policy adaptation into a single model
-action, so you cannot trace a return back to the component that caused it.
-DarwinTrade instead decomposes adaptation into **three loops that own disjoint
-state and run on their own clocks**, over a deterministic allocator the LLM
-never edits:
-
-| Loop | Cadence | Writes | Reverts by |
-|---|---|---|---|
-| **Analyst** | every bar | per-`(regime, role)` IC reliability | positive-IC gate drops a role |
-| **Tactical** | every bar | 1–3 bar risk guards | automatic TTL expiry |
-| **Strategic** | every 3 episodes | bounded allocator patch | logged rollback trigger |
-
-Each update is logged with its state owner, trigger, and outcome, which makes
-adaptation inspectable rather than hidden inside a reflection prompt.
-
-## Quickstart
+Python 3.11 or 3.12 is recommended. No Node.js or frontend build is required.
 
 ```bash
 git clone https://github.com/Jacob6812/DarwinTrade.git
 cd DarwinTrade
-pip install -r requirements.txt
-cp .env.example .env      # then fill in LLM_BASE_URL / LLM_API_KEY / LLM_MODEL
+python -m venv .venv
 ```
 
-Run one quarter on the default 20-stock universe:
+Activate the environment:
+
+```powershell
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+Copy-Item .env.example .env
+```
 
 ```bash
-python -m backtest.stockbench.cli --start 2025-04-01 --end 2025-06-30
+# macOS / Linux
+source .venv/bin/activate
+cp .env.example .env
 ```
 
-Artifacts land in `storage/reports/backtest/<run_id>/` (NAV, trades, metrics,
-per-bar decision records).
-
-> **Note.** Market data is served from `storage/cache/`, which is **not**
-> included in this repository (it is multi-GB). Cache misses fall back to live
-> Polygon/Finnhub calls and need the corresponding keys in `.env`. Use
-> `--offline` to fail loudly instead of hitting the network.
-
-## Requirements
-
-- Python 3.10+ (developed and tested on 3.13)
-- An OpenAI-compatible LLM endpoint (reported runs used `mimo-v2.5-pro`,
-  temperature `0`, seed `1234`, JSON-schema enforced output)
-- Optional, only to build the cache: Polygon, Finnhub, Alpha Vantage keys
-
-## How one bar runs
-
-`DarwinTradePipeline.run(...)` executes in this order each trading day:
-
-1. **Close the previous bar.** Run tactical reflection/evolution on yesterday's
-   episode and install fresh `TacticalInfluence` (1–3 bar TTL). Commit realized
-   returns into `AnalystMemory` capsules so each `(regime, role)` IC stays
-   current. On the strategic cadence, run reflection → diagnosis → policy author
-   and apply the resulting `StrategicPatch`.
-2. **Build memory influence.** Merge the strategic baseline with active tactical
-   hints (`avoid_symbols`, `reduce_only`, `position_haircut`). An
-   `urgency=emergency` guard can tighten the gross-exposure cap further.
-3. **Classify regime.** `RegimeAgent` emits a label plus confidence, with a
-   deterministic trend-rule fallback when the LLM is unavailable.
-4. **Score symbols.** `MarketAgent` runs the LangGraph analyst team
-   (market / news / social / fundamentals) per symbol concurrently. Each role's
-   `score`/`confidence` is weighted by `max(0, IC) × shrink(n)` and summed into
-   one `AssetSignal`. The regime reaches the aggregator through
-   `set_aggregator_runtime`, not through analyst prompts, so IC weights stay
-   keyed to the active regime without leaking it into the evidence.
-5. **Allocate.** `PortfolioAllocator` splits the gross budget between long and
-   short legs by confidence mass, then applies `max_single_position`, the
-   tactical haircut, and `max_gross_exposure`.
-6. **Execute.** Each order carries an explicit side
-   (`buy` / `sell` / `sell_short` / `buy_to_cover`) so direction survives into
-   the engine.
-
-Net exposure is a *consequence* of cross-sectional selection — the
-confidence-mass long/short split — not a free parameter.
-
-## Long and short are first-class
-
-`AssetSignal.direction` is `long`, `short`, or `hold`, and the allocator emits
-**signed** weights. The `darwintrade/` package has no `allow_short` flag and no
-long-only fallback path — shorting is structural, not opt-in. (The
-`allow_short` you may find under `backtest/stockbench/strategies/` belongs to the
-external baseline adapters, not to DarwinTrade.) A signal flip on a held name
-produces two ordered legs: close, then open.
-
-```
-LLM signal   → direction   allocator action              engine side
-BUY          → long        open_long / increase_long      buy
-SELL         → short       open_short / increase_short    sell_short
-(reduce)                   close_long                     sell
-(flip)                     close_short                    buy_to_cover
-```
-
-`max_gross_exposure` bounds `|long| + |short|`; `max_single_position` bounds
-`|target_weight|` per name.
-
-## Configuration
-
-`backtest/stockbench/config_darwintrade.yaml` is the reference config:
-
-```yaml
-symbols_universe: [GS, MSFT, HD, V, SHW, CAT, MCD, UNH, AXP, AMGN,
-                   TRV, CRM, JPM, IBM, HON, BA, AMZN, AAPL, PG, JNJ]
-
-portfolio:
-  total_cash: 100000
-
-backtest:
-  commission_bps: 1.0
-  slippage_bps: 2.0
-  fill_ratio: 1.0
-  max_positions: 20
-  benchmark:
-    type: per_symbol_buy_and_hold
-    symbol: SPY
-
-darwintrade:
-  max_gross_exposure: 0.95      # |long| + |short| ceiling
-  max_single_position: 1.0      # per-name cap (1.0 == permissive)
-  min_confidence_threshold: 0.35
-  tactical_enabled: true
-  strategic_enabled: true
-  memory:
-    enabled: true               # master switch
-```
-
-Credentials come from `.env` only (see `.env.example`). DarwinTrade uses its own
-`LLMClient` and reads `LLM_*` directly — there is no `--llm-profile` switch. The
-`api.polygon` / `api.finnhub` blocks only seed engine-side fetchers on cache
-misses.
-
-## Reproducing the ablations
-
-`backtest/stockbench/ablation/` holds the full `2³` factorial over
-{tactical, strategic, analyst-capsule}:
-
-| Config | Disabled |
-|---|---|
-| `config_darwintrade_no_tactical.yaml` | tactical |
-| `config_darwintrade_no_strategic.yaml` | strategic |
-| `config_darwintrade_no_analyst_capsule.yaml` | analyst capsules |
-| `config_darwintrade_only_tactical.yaml` | all but tactical |
-| `config_darwintrade_only_strategic.yaml` | all but strategic |
-| `config_darwintrade_only_capsule.yaml` | all but analyst capsules |
-| `config_darwintrade_no_memory.yaml` | all three |
+Install and configure:
 
 ```bash
-# Single cell
-python -m backtest.stockbench.cli \
-  --cfg backtest/stockbench/ablation/config_darwintrade_no_tactical.yaml
-
-# Default matrix, or the full factorial
-bash scripts/run_ablations.sh
-ABLATIONS="baseline no-strategic no-tactical no-analyst-capsule \
-           only-tactical only-strategic only-capsule no-memory" \
-  bash scripts/run_ablations.sh
-
-# Preview the experiment matrix without launching
-DRYRUN=1 bash scripts/run_experiments.sh
+python -m pip install -e .
 ```
 
-## Common operations
+Edit `.env` with your own OpenAI-compatible provider settings:
+
+```dotenv
+LLM_BASE_URL=https://your-provider.example.com/v1
+LLM_API_KEY=your-key
+LLM_MODEL=your-provider-model-name
+POLYGON_API_KEY=your-market-data-key
+FINNHUB_API_KEY=your-finnhub-key
+DARWINTRADE_DATA_MODE=auto
+```
+
+The endpoint must support chat completions and structured responses. Data availability depends on provider entitlements, rate limits and historical coverage. The repository does not include market-data caches or credentials. A missing or unavailable provider can prevent a run or leave part of the evidence unavailable.
 
 ```bash
-# 3-day offline smoke test
-python -m backtest.stockbench.cli \
-  --start 2025-03-03 --end 2025-03-05 --offline --no-resume --run-id smoke3day
-
-# Resume an interrupted run
-python -m backtest.stockbench.cli --resume \
-  --resume-summary storage/reports/backtest/<run_id>/daily_run_summary.jsonl \
-  --resume-date 2025-04-15
-
-# Override the universe ad hoc
-python -m backtest.stockbench.cli --symbols AAPL,MSFT,JPM \
-  --start 2025-04-01 --end 2025-06-30
+darwintrade serve
 ```
 
-## Repository layout
+Open **http://127.0.0.1:8000**. If the command is not on your PATH, use `python -m darwintrade.live.cli serve`. Start the command from the directory containing your `.env`.
 
-```
-darwintrade/              Strategy: agents, memory, allocator, pipeline
-├── pipeline.py           Per-bar entrypoint (DarwinTradePipeline)
-├── core/                 Contracts, OpenAI-compatible LLM client, skill loader
-├── agents/               Regime classifier, analyst-team wrapper, evolution agents
-│   └── bayesian_aggregator.py   IC-weighted signal fusion
-├── agentic/              LangGraph analyst team + tool registry/planner/executor
-├── memory/               tactical.py, strategic.py, analyst_capsules.py, combined.py
-├── portfolio/allocator.py       Signed-weight long/short allocator
-└── integrations/llm/     MCP shim, tool implementations, .env loader
+Use **Explore sample report** to inspect the interface without credentials. Its prices and allocations are explicitly illustrative; it makes no provider calls and changes no session.
 
-backtest/stockbench/      Self-contained backtest engine
-├── cli.py                Entrypoint
-├── engine.py             Cash-flow aware, signed-share engine
-├── core/                 data_hub, executor, price_utils, features, schemas
-├── strategies/           darwintrade + rule-based / predictive / classical-quant
-│                         / TradingAgents / FinAgent baselines
-├── metrics.py            Sharpe, Sortino, IR, drawdown
-├── config_darwintrade.yaml
-└── ablation/             2³ factorial configs
+## Your first analysis
 
-scripts/                  Ablation + experiment matrix runners, cache backfill
-skills/                   LLM role prompts as markdown (see below)
-```
+1. Enter tickers such as `AAPL, MSFT, NVDA`, or select a sample watchlist. Requests accept up to 30 distinct US tickers.
+2. Enter starting equity in USD. Leave the date blank to use the latest US trading day, or choose a historical trading day covered by your data source.
+3. Select **Run analysis**. The elapsed timer shows that the request is pending; runtime depends on the number of stocks, provider latency and retries. Keep the page open.
+4. Review the regime, long/short weights, signed notionals, reference prices, analyst thesis and risk flags. Missing symbols are reported separately. A no-position result is possible.
+5. Use **Download JSON** to save the full report.
 
-## Skills
+Reference prices use the selected day's open when available, otherwise a prior cached close. They are not streaming execution quotes. The benchmark trend and return history use earlier bars. Historical analysis is research replay; it is not a guarantee that every external information source provides a point-in-time snapshot.
 
-Role prompts live as standalone markdown in `skills/<role>/SKILL.md`.
-`darwintrade/core/skills.py` appends the relevant body to each agent's base
-system prompt, so behavior can be tuned without touching code.
+### Continue learning across days
 
-| Skill | Loaded by |
-|---|---|
-| `market-regime-analyst` | `RegimeAgent` |
-| `market-analyst` | analyst team, `market_analyst` role |
-| `news-analyst` | analyst team, `news_analyst` role |
-| `social-analyst` | analyst team, `social_analyst` role |
-| `fundamentals-analyst` | analyst team, `fundamentals_analyst` role |
-| `tactical-reflection` | `TacticalReflectionAgent` |
-| `tactical-evolution` | `TacticalEvolutionAgent` |
-| `strategic-reflection` | `StrategicReflectionAgent` |
-| `strategic-diagnosis` | strategic diagnosis step |
-| `strategic-policy-author` | strategic policy author step |
+Keep **Keep memory across runs** enabled to reuse a session. The browser remembers its session ID across refreshes; session files remain on the server. Continue with a strictly later trading date. To compare the same day, change starting capital, or analyse earlier history, choose **New session**.
 
-## Implementation notes
+The recommended portfolio is simulated forward using observed price changes. This is hypothetical equity, not a broker balance: it excludes actual fills, fees, borrowing costs and slippage. The first run has no outcome feedback; later runs accumulate it with a one-bar release delay. Missing prices do not contribute returns, so keep a consistent watchlist for meaningful comparisons.
 
-- The analyst graph is a single `research` node that fans out four roles in
-  parallel and aggregates their `score`/`confidence` — there are no separate
-  portfolio-manager or verification LLM passes.
-- Tool calls route through an in-process MCP shim
-  (`darwintrade.integrations.llm.mcp`) that selects providers, normalizes
-  outputs, and surfaces availability flags so the graph degrades gracefully when
-  a provider returns nothing.
-- Capsule IC estimates are online and persist across runs at
-  `<artifact_root>/memory/analyst_capsules.json`. Delete it to start cold.
-  Capsule hyper-priors (`analyst_capsules.py`): warm-up `N=20`, history cap
-  `200`, realized-return clip `±20%`, score-SD floor `0.05`, prior realized SD
-  `0.02`.
-- All evidence admitted on day `t` is timestamped strictly before `t`. The
-  day-`t` open is an execution reference only, and the return it realizes enters
-  state on bar `t+1`.
+## Terminal and API
 
-## Citation
-
-```bibtex
-@article{fang2026darwintrade,
-  title  = {DarwinTrade: Hierarchical Self-Evolution for Multi-Agent Portfolio Trading},
-  author = {Fang, Jie and Zhang, Shaolei},
-  year   = {2026}
-}
+```bash
+darwintrade predict AAPL MSFT NVDA --capital 100000 --date 2025-06-25
+darwintrade predict AAPL MSFT NVDA --session SESSION_ID --date 2025-06-26
 ```
 
-## License
+CLI reports are JSON on stdout; session information is printed to stderr. Omit `--capital` when continuing a session so its simulated equity compounds.
 
-MIT — see [LICENSE](LICENSE).
+Interactive API documentation is at **http://127.0.0.1:8000/docs**.
 
-## Disclaimer
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/health` | Server configuration and model-key readiness |
+| `POST /api/decide` | Analyse `symbols`, optional `trade_date`, `capital`, `session_id` |
+| `POST /api/sessions` | Create a session with optional capital and label |
+| `GET /api/sessions` | List persisted sessions |
+| `GET /api/sessions/{id}` | Read a session's state and recent history |
 
-Research artifact for reproducing the paper's experiments. Not investment
-advice, and not intended for live trading. Results depend on the offline
-evidence cache, the LLM provider, and the cost model, and do not predict future
-returns. Reported runs assume frictionless shorting with no borrow cost.
+Health confirms configuration, not successful provider connectivity. Invalid symbols, dates, missing credentials and missing prices produce actionable errors. Run a small analysis to check your own provider access.
+
+## Configuration and storage
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `DARWINTRADE_DATA_MODE` | `auto` | Use providers on cache miss; `offline_only` restricts market data to cache |
+| `DARWINTRADE_CACHE_DIR` | `storage/cache` | Market-data cache |
+| `DARWINTRADE_SESSION_DIR` | `storage/live/sessions` | Session state, memory and decision JSON |
+| `DARWINTRADE_DEFAULT_CAPITAL` | `100000` | Starting equity in USD |
+| `DARWINTRADE_MAX_GROSS_EXPOSURE` | `0.95` | Initial gross exposure cap |
+| `DARWINTRADE_MAX_SINGLE_POSITION` | `1.0` | Initial per-stock cap |
+| `DARWINTRADE_MIN_CONFIDENCE` | `0.35` | Initial signal confidence threshold |
+| `LLM_REQUEST_TIMEOUT` | `120` in example | Per-provider-request timeout in seconds |
+
+`--offline` still requires an LLM endpoint. It is not a free demo and only works for symbols/dates already cached. `--cache-dir` and `--session-dir` override the paths for both CLI commands.
+
+Use one server process for a session directory. The server serializes decisions within each session; independent worker processes do not share those locks. Back up session storage to preserve memory.
+
+## Docker
+
+After creating `.env`:
+
+```bash
+docker compose up --build
+```
+
+Open **http://127.0.0.1:8000**. Compose keeps sessions in a named volume and mounts `storage/cache` for market data. The service runs as a non-root user. Bind-mounted cache directories must be writable by UID 10001 on Linux.
+
+The app is designed for local use. The API has no authentication and analysis consumes provider quota. Keep the default localhost binding; network deployment requires an authenticated proxy and request limits.
+
+## Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| No LLM key configured | Edit `.env` in your launch directory, then restart the server. |
+| No usable price | Check ticker/date, provider credentials and coverage; offline mode requires a populated cache. |
+| Same or earlier date rejected | Start a new session, or continue on a later trading day. |
+| Analysis failed | Inspect the server terminal for provider errors; check model name, endpoint, quota and network access. |
+| Long-running request | A run may include multiple calls and retries per analyst. The browser timer does not imply completion. |
+| Port already in use | Run `darwintrade serve --port 8001`. |
+
+## Development and verification
+
+```bash
+python -m pip install -e ".[dev]"
+python -m pytest -q --ignore=tests/test_offline_cache_completeness.py
+python -m build --wheel
+```
+
+Install `build` separately with `python -m pip install build`. Tests stub LLM calls. Cache-dependent tests skip when private cached data is absent; the API continuation test uses synthetic inputs and exercises the actual pipeline and allocator. The cache-completeness test is intended for a fully populated research dataset, not a fresh clone. Passing offline tests does not measure forecasting performance or provider availability.
+
+The frontend lives in `darwintrade/live/static/`, API and session handling in `darwintrade/live/`, strategy code in `darwintrade/`, and the research engine in `backtest/`. See [research documentation](docs/RESEARCH.md) for architecture, ablations and experiment commands.
+
+## Research and citation
+
+This project implements *DarwinTrade: Hierarchical Self-Evolution for Multi-Agent Portfolio Trading* by Jie Fang and Shaolei Zhang. See [CITATION.cff](CITATION.cff) for citation metadata and [research documentation](docs/RESEARCH.md) for reproduction.
+
+Licensed under [MIT](LICENSE). Research support only; model outputs can be wrong and require independent review.

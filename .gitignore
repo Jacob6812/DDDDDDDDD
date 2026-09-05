@@ -35,6 +35,9 @@ storage/cache/
 # In-run memory state written by pipeline
 storage/memory/
 
+# Live-tool session state: per-session memory + decision artifacts
+storage/live/
+
 # === Agent tooling state (contains absolute paths / local machine details) ===
 .omc/
 .claude/
@@ -62,11 +65,9 @@ storage/memory/
 external/
 
 # Third-party material: published PDFs and other authors' paper sources.
+# Not ours to redistribute, and the author blocks break submission anonymity.
 literature/
 mentor_work/
-
-# Paper sources live in a separate repository.
-AAAIAuthorKit27/
 
 # tmp / scratch
 tmp/
@@ -77,10 +78,9 @@ tmp/
 # Notebooks checkpoints
 .ipynb_checkpoints/
 
-# --- explicit KEEP override ---
-# .env.example is the credential template and must be versioned even though
-# the `.env.*` secret rule above would otherwise catch it.
+# --- explicit KEEP overrides ---
 !.env.example
-
-# Tests are maintained in the development repository, not the code release.
-tests/
+# Paper sources must be versioned even though the LaTeX artefact rules above
+# would otherwise catch same-named files.
+!AAAIAuthorKit27/**/*.tex
+!AAAIAuthorKit27/**/*.bib

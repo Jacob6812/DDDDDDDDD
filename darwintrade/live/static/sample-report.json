@@ -1,0 +1,19 @@
+{
+  "sample": true,
+  "session_id": null,
+  "trade_date": "2025-06-25",
+  "trade_date_inferred": false,
+  "decision_index": 1,
+  "capital": 100000,
+  "regime": {"label": "bull", "confidence": 0.7, "evidence": ["Illustrative regime, not a measured market conclusion."]},
+  "positions": [
+    {"symbol": "AAPL", "direction": "long", "target_weight": 0.35, "target_notional": 35000, "reference_price": 200, "confidence": 0.72, "thesis": "Illustrative thesis: improving momentum and stable fundamentals support a measured long allocation.", "risk_flags": ["Example only — no live analysis"]},
+    {"symbol": "MSFT", "direction": "long", "target_weight": 0.3, "target_notional": 30000, "reference_price": 500, "confidence": 0.68, "thesis": "Illustrative thesis: recurring revenue supports the signal, with valuation limiting position size.", "risk_flags": ["Valuation sensitivity"]},
+    {"symbol": "NVDA", "direction": "short", "target_weight": -0.15, "target_notional": -15000, "reference_price": 150, "confidence": 0.57, "thesis": "Illustrative thesis: a short position offsets some long exposure. This example is not a recommendation to short NVDA.", "risk_flags": ["Borrowing costs and short squeeze risk"]}
+  ],
+  "watchlist": [],
+  "exposure": {"gross": 0.8, "long_gross": 0.65, "short_gross": 0.15, "net": 0.5},
+  "memory": {"source_layer": "none", "total_episodes": 0, "position_haircut": 1, "outcome_released": false, "avoid_symbols": [], "capsules": []},
+  "data": {"analysed": ["AAPL", "MSFT", "NVDA"], "skipped_symbols": {}},
+  "disclaimer": "SAMPLE REPORT — all prices, signals and allocations here are illustrative. No model or market-data service was called. No session was created or changed."
+}

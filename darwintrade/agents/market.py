@@ -1,9 +1,8 @@
 """
 MarketAgent: wraps DarwinTradeAgenticAnalystBackend.
 
-Each symbol is analyzed concurrently by the full LangGraph multi-role team:
-  market_analyst → news_analyst → fundamentals_analyst → risk_manager
-  → portfolio_manager → verification_agent → board_moderator → allocator_agent
+Each symbol is researched by market, news, social and fundamentals analysts.
+The deterministic aggregator combines their signals before portfolio allocation.
 
 Results are converted to AssetSignal for the portfolio allocator.
 """
@@ -39,7 +38,7 @@ def _confidence_from_packet(packet: Any) -> float:
 def _thesis_from_packet(packet: Any) -> str:
     try:
         view = packet.asset_view
-        return str(getattr(view, "summary", "") or getattr(view, "thesis", "") or "")[:500]
+        return str(getattr(view, "summary", "") or getattr(view, "thesis", "") or getattr(view, "rationale", "") or "")[:4000]
     except Exception:
         return ""
 

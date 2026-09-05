@@ -7,7 +7,22 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-_SKILLS_ROOT = Path(__file__).resolve().parents[2] / "skills"
+def _resolve_skills_root() -> Path:
+    """Locate the skills directory in both a source checkout and an install.
+
+    `skills/` lives at the repo root, not inside the package, so an installed
+    wheel has it under `darwintrade/skills/` (see package-data) while a checkout
+    has it one level above the package. Missing skills degrade silently to empty
+    prompts, so preferring the wrong root would quietly strip every agent's
+    instructions instead of failing loudly.
+    """
+    packaged = Path(__file__).resolve().parents[1] / "skills"
+    if packaged.is_dir():
+        return packaged
+    return Path(__file__).resolve().parents[2] / "skills"
+
+
+_SKILLS_ROOT = _resolve_skills_root()
 
 
 def _strip_frontmatter(text: str) -> str:

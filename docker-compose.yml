@@ -1,0 +1,31 @@
+# DarwinTrade web UI + API.
+#
+#   cp .env.example .env   # fill in LLM_BASE_URL / LLM_API_KEY / LLM_MODEL
+#   docker compose up
+#   open http://localhost:8000
+services:
+  darwintrade:
+    build: .
+    image: darwintrade:latest
+    # Bound to localhost: the API has no authentication and every request spends
+    # LLM and market-data quota. Change to "8000:8000" only behind a proxy that
+    # adds auth.
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - .env
+    volumes:
+      # Session memory lives here; keeping it across rebuilds is what lets
+      # self-evolution accumulate. Without it, memory restarts from scratch.
+      - darwintrade-data:/data
+      # Share the repo's existing cache (bars, news, fundamentals) so a fresh
+      # container does not refetch what the paper runs already cached. Mounted
+      # read-write so live fetches extend the same cache.
+      - ./storage/cache:/cache
+    environment:
+      DARWINTRADE_STORAGE_DIR: /data
+      DARWINTRADE_CACHE_DIR: /cache
+    restart: unless-stopped
+
+volumes:
+  darwintrade-data:

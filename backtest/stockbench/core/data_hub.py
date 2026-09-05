@@ -36,6 +36,29 @@ _polygon_client = PolygonClient(os.getenv("POLYGON_API_KEY", ""))
 _finnhub_client = FinnhubClient(os.getenv("FINNUB_API_KEY", ""), warn_if_missing=False)
 
 
+def set_cache_root(root: str) -> None:
+    """Repoint every read/write cache directory at `root`.
+
+    The paths above are resolved relative to the repo, which is what backtests
+    want. The live tool lets a user choose where bars/news/fundamentals live, so
+    it calls this once at start-up. Report and legacy-CSV directories are left
+    alone — they are outputs, not cache.
+
+    Callers must invoke this before the first data access; the constants are read
+    at call time, so a mid-run switch would split the cache across two roots.
+    """
+    global _CACHE_BASE, _PARQUET_BASE, _CORP_ACTIONS_DIR, _NEWS_BY_DAY_BASE
+    base = os.path.abspath(root)
+    _CACHE_BASE = base
+    _PARQUET_BASE = os.path.join(base, "parquet")
+    _CORP_ACTIONS_DIR = os.path.join(base, "corporate_actions")
+    _NEWS_BY_DAY_BASE = os.path.join(base, "news_by_day")
+
+
+def get_cache_root() -> str:
+    return _CACHE_BASE
+
+
 # Global data mode control: auto | offline_only
 # - auto: current behavior (use local cache first, then call APIs if needed)
 # - offline_only (aliases: offline/cache_only/cache): strictly use local data; never call external APIs

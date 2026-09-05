@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, "codex/**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Import check
+        # Catches packaging regressions the unit tests would miss: the live layer
+        # reaches across into `backtest.stockbench`, and the skill prompts load
+        # from disk, so a bad path shows up as a silent empty prompt rather than
+        # a failure.
+        run: |
+          python -c "
+          from darwintrade.live.api import create_app
+          from darwintrade.live.config import LiveSettings
+          from darwintrade.core.skills import load_skill, _SKILLS_ROOT
+          assert _SKILLS_ROOT.is_dir(), f'skills root missing: {_SKILLS_ROOT}'
+          assert load_skill('market-analyst'), 'skill prompts did not load'
+          app = create_app(LiveSettings.from_env())
+          paths = {r.path for r in app.routes if hasattr(r, 'path')}
+          assert {'/api/health', '/api/decide'} <= paths, paths
+          print('import check ok')
+          "
+
+      - name: Tests
+        # The offline-cache guardrail asserts the paper's pre-cached parquet
+        # bars are present; those are gitignored, so it cannot pass in CI.
+        run: pytest -q --ignore=tests/test_offline_cache_completeness.py
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+
+      - name: Verify wheel contents
+        # The agent prompts and the front-end assets live outside the package
+        # tree and are mapped in via package-data. If that mapping breaks, an
+        # installed copy degrades silently instead of erroring.
+        run: |
+          python - <<'PY'
+          import glob, zipfile
+          wheel = glob.glob("dist/*.whl")[0]
+          names = zipfile.ZipFile(wheel).namelist()
+          required = [
+              "darwintrade/live/static/index.html",
+              "darwintrade/live/static/app.js",
+              "darwintrade/skills/market-analyst/SKILL.md",
+              "backtest/stockbench/config_darwintrade.yaml",
+          ]
+          missing = [r for r in required if r not in names]
+          assert not missing, f"missing from wheel: {missing}"
+          skills = [n for n in names if n.startswith("darwintrade/skills/")]
+          assert len(skills) >= 10, f"expected 10 skill prompts, found {len(skills)}"
+          print(f"wheel ok: {len(names)} files, {len(skills)} skill prompts")
+          PY
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start service
+        run: |
+          docker build -t darwintrade:ci .
+          docker run -d --name darwintrade-ci -p 127.0.0.1:8000:8000 darwintrade:ci
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/api/health; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8000/api/health
+          curl -fsS http://127.0.0.1:8000/static/sample-report.json
+      - name: Container logs
+        if: always()
+        run: docker logs darwintrade-ci || true

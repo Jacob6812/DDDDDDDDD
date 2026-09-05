@@ -357,16 +357,47 @@ def _normalized_news_articles(
     return articles, _sentiment_score(texts)
 
 
+# Cache root for the analyst tools. Defaults to the repo's `storage/cache`, which
+# is what backtests use. The live tool lets the user relocate it via
+# `set_cache_root`, so these stay functions rather than module constants.
+_CACHE_ROOT_OVERRIDE: Path | None = None
+
+# Data mode handed to `data_hub` when the analyst tools fetch bars. Backtests pin
+# this to `offline_only` so a 4-hour run can never stall on a rate limit, and so
+# an experiment reads exactly the bars that were pre-cached. The live tool needs
+# the opposite: today's bars are not in the cache yet, so it must be allowed to
+# call out.
+_BARS_DATA_MODE: str = "offline_only"
+
+
+def set_cache_root(root: str | Path | None) -> None:
+    global _CACHE_ROOT_OVERRIDE
+    _CACHE_ROOT_OVERRIDE = Path(root) if root else None
+
+
+def set_bars_data_mode(mode: str) -> None:
+    """Set the data mode the analyst price-history tool passes to `data_hub`."""
+    global _BARS_DATA_MODE
+    normalized = str(mode or "").strip().lower()
+    _BARS_DATA_MODE = (
+        "auto" if normalized == "auto" else "offline_only"
+    )
+
+
+def _cache_root() -> Path:
+    return _CACHE_ROOT_OVERRIDE or (REPO_ROOT / "storage" / "cache")
+
+
 def _fundamentals_cache_root() -> Path:
-    return REPO_ROOT / "storage" / "cache" / "fundamentals"
+    return _cache_root() / "fundamentals"
 
 
 def _news_by_day_cache_root() -> Path:
-    return REPO_ROOT / "storage" / "cache" / "news_by_day"
+    return _cache_root() / "news_by_day"
 
 
 def _filing_text_cache_root() -> Path:
-    return REPO_ROOT / "storage" / "cache" / "filing_text"
+    return _cache_root() / "filing_text"
 
 
 def _load_filing_text(symbol: str, trade_date: str) -> dict[str, Any]:
@@ -868,7 +899,7 @@ class DarwinTradeMCPProvider:
             multiplier=1,
             timespan="day",
             adjusted=True,
-            cfg={"data": {"mode": "offline_only"}},
+            cfg={"data": {"mode": _BARS_DATA_MODE}},
         )
 
         # data_hub returns OHLCV schema: date/open/high/low/close/volume/vwap
