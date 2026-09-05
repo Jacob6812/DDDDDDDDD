@@ -138,6 +138,8 @@ python -m build --wheel
 
 网页位于 `darwintrade/live/static/`，API 和会话位于 `darwintrade/live/`，研究回测引擎位于 `backtest/`。算法、消融及复现命令见 [研究文档](docs/RESEARCH_ZH.md)。
 
+可选前端回归测试使用 Node.js 22：执行 `npm ci --ignore-scripts` 后运行 `npm test`。覆盖会话恢复、资金延续、示例隔离、重复提交、错误恢复和模型文本安全渲染。运行工具本身不需要 Node.js。
+
 ## 研究与引用
 
 本项目实现 Jie Fang 与 Shaolei Zhang 的 *DarwinTrade: Hierarchical Self-Evolution for Multi-Agent Portfolio Trading*。引用信息见 [CITATION.cff](CITATION.cff)。采用 [MIT 许可证](LICENSE)。

@@ -11,6 +11,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm test
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -53,6 +64,23 @@ jobs:
         # The offline-cache guardrail asserts the paper's pre-cached parquet
         # bars are present; those are gitignored, so it cannot pass in CI.
         run: pytest -q --ignore=tests/test_offline_cache_completeness.py
+
+      - name: Installed wheel smoke test outside checkout
+        run: |
+          pip wheel --no-deps . -w /tmp/darwintrade-wheel
+          pip install --force-reinstall --no-deps /tmp/darwintrade-wheel/*.whl
+          cd "$RUNNER_TEMP"
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from darwintrade.live.api import create_app
+          from darwintrade.core.skills import load_skill
+          client = TestClient(create_app())
+          assert client.get('/').status_code == 200
+          assert client.get('/static/sample-report.json').json()['sample']
+          assert client.get('/api/health').status_code == 200
+          assert load_skill('market-analyst')
+          print('Installed wheel serves UI, sample, health and analyst prompts')
+          PY
 
   build:
     runs-on: ubuntu-latest

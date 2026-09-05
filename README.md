@@ -148,6 +148,8 @@ Install `build` separately with `python -m pip install build`. Tests stub LLM ca
 
 The frontend lives in `darwintrade/live/static/`, API and session handling in `darwintrade/live/`, strategy code in `darwintrade/`, and the research engine in `backtest/`. See [research documentation](docs/RESEARCH.md) for architecture, ablations and experiment commands.
 
+Optional frontend regression tests use Node.js 22: `npm ci --ignore-scripts` then `npm test`. They cover restored sessions, continued equity, sample isolation, duplicate submissions, error recovery and safe rendering of provider text. Node.js is not needed to run the application.
+
 ## Research and citation
 
 This project implements *DarwinTrade: Hierarchical Self-Evolution for Multi-Agent Portfolio Trading* by Jie Fang and Shaolei Zhang. See [CITATION.cff](CITATION.cff) for citation metadata and [research documentation](docs/RESEARCH.md) for reproduction.

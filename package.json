@@ -1,0 +1,7 @@
+{
+  "name": "darwintrade-ui-tests",
+  "private": true,
+  "description": "Optional DOM regression tests; the application needs no Node build.",
+  "scripts": {"test": "node --test tests/ui.test.cjs"},
+  "devDependencies": {"jsdom": "^26.1.0"}
+}
